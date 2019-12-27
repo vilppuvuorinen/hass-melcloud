@@ -116,7 +116,7 @@ class MelCloudClimate(ClimateDevice):
         operation_mode = HVAC_MODE_REVERSE_LOOKUP.get(hvac_mode, None)
         if operation_mode is None:
             raise ValueError("Invalid hvac_mode [{}]", hvac_mode)
-        self._api.device.set({"operation_mode": operation_mode})
+        await self._api.device.set({"operation_mode": operation_mode})
 
     @property
     def hvac_modes(self) -> List[str]:
@@ -140,7 +140,7 @@ class MelCloudClimate(ClimateDevice):
 
     async def async_set_temperature(self, **kwargs) -> None:
         """Set new target temperature."""
-        self._api.device.set(
+        await self._api.device.set(
             {"target_temperature": kwargs.get("temperature", self.target_temperature)}
         )
 
@@ -162,7 +162,7 @@ class MelCloudClimate(ClimateDevice):
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new target fan mode."""
-        self._api.device.set({"fan_speed": fan_mode.replace(" ", "-")})
+        await self._api.device.set({"fan_speed": fan_mode.replace(" ", "-")})
 
     @property
     def fan_modes(self) -> Optional[List[str]]:
@@ -178,12 +178,12 @@ class MelCloudClimate(ClimateDevice):
     async def async_turn_on(self) -> None:
         """Turn the entity on."""
         if not self._api.device.power:
-            self._api.device.set({"power": True})
+            await self._api.device.set({"power": True})
 
     async def async_turn_off(self) -> None:
         """Turn the entity off."""
         if self._api.device.power:
-            self._api.device.set({"power": False})
+            await self._api.device.set({"power": False})
 
     @property
     def supported_features(self) -> int:
