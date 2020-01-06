@@ -23,12 +23,13 @@ class FlowHandler(config_entries.ConfigFlow):
     """Handle a config flow."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
+    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
     async def _create_entry(self, email: str, token: str):
         """Register new entry."""
         for entry in self._async_current_entries():
             if entry.data.get(CONF_EMAIL, entry.title) == email:
+                entry.connection_class = self.CONNECTION_CLASS
                 self.hass.config_entries.async_update_entry(
                     entry, data={CONF_EMAIL: email, CONF_TOKEN: token,}
                 )
