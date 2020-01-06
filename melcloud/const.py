@@ -16,10 +16,6 @@ from homeassistant.components.climate.const import (
 )
 from homeassistant.const import CONF_ICON, CONF_NAME, CONF_TYPE
 
-ATTR_TARGET_TEMPERATURE = "target_temperature"
-ATTR_INSIDE_TEMPERATURE = "inside_temperature"
-ATTR_OUTSIDE_TEMPERATURE = "outside_temperature"
-
 DOMAIN = "melcloud"
 
 HVAC_MODE_LOOKUP = {
@@ -30,21 +26,6 @@ HVAC_MODE_LOOKUP = {
     pymelcloud.OPERATION_MODE_HEAT_COOL: HVAC_MODE_HEAT_COOL,
 }
 HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in HVAC_MODE_LOOKUP.items()}
-
-SENSOR_TYPE_TEMPERATURE = "temperature"
-
-SENSOR_TYPES = {
-    ATTR_INSIDE_TEMPERATURE: {
-        CONF_NAME: "Inside Temperature",
-        CONF_ICON: "mdi:thermometer",
-        CONF_TYPE: SENSOR_TYPE_TEMPERATURE,
-    },
-    ATTR_OUTSIDE_TEMPERATURE: {
-        CONF_NAME: "Outside Temperature",
-        CONF_ICON: "mdi:thermometer",
-        CONF_TYPE: SENSOR_TYPE_TEMPERATURE,
-    },
-}
 
 TEMP_UNIT_LOOKUP = {
     pymelcloud.UNIT_TEMP_CELSIUS: TEMP_CELSIUS,

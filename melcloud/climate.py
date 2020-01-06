@@ -11,7 +11,6 @@ from homeassistant.components.climate.const import (
     DEFAULT_MAX_TEMP,
     HVAC_MODE_OFF,
     SUPPORT_FAN_MODE,
-    # SUPPORT_SWING_MODE,
     SUPPORT_TARGET_TEMPERATURE,
 )
 from homeassistant.const import (
