@@ -3,7 +3,7 @@
   "name": "MELCloud",
   "config_flow": true,
   "documentation": "",
-  "requirements": ["pymelcloud==0.3.0"],
+  "requirements": ["pymelcloud==0.5.1"],
   "ssdp": [],
   "zeroconf": [],
   "homekit": {},

@@ -121,11 +121,17 @@ class MelCloudDevice:
     @property
     def device_info(self):
         """Return a device description for device registry."""
-        return {
+        _device_info = {
             "identifiers": {(DOMAIN, f"{self.device.mac}-{self.device.serial}")},
             "manufacturer": "Mitsubishi Electric",
             "name": self.name,
         }
+        unit_infos = self.device.units
+        if unit_infos is not None:
+            _device_info["model"] = ", ".join(
+                list(set(map(lambda x: x["model"], unit_infos)))
+            )
+        return _device_info
 
 
 async def mel_api_setup(hass, token) -> Optional[List[MelCloudDevice]]:
