@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Connect to MELCloud",
-        "description": "Credentials are not saved to Home Assistant.",
+        "description": "Connect using your MELCloud account.",
         "data": {
           "email": "Email used to login to MELCloud.",
           "password": "MELCloud password."
@@ -17,7 +17,7 @@
       "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "Device is already configured"
+      "already_configured": "MELCloud integration already configured for {email}. Existing access token has been refreshed."
     }
   }
 }

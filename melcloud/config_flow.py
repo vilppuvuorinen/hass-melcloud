@@ -27,12 +27,19 @@ class FlowHandler(config_entries.ConfigFlow):
 
     async def _create_entry(self, email: str, token: str):
         """Register new entry."""
-        # Check if mac already is registered
         for entry in self._async_current_entries():
-            if entry.data[CONF_EMAIL] == email:
-                return self.async_abort(reason="already_configured")
+            if entry.data.get(CONF_EMAIL, entry.title) == email:
+                self.hass.config_entries.async_update_entry(
+                    entry, data={CONF_EMAIL: email, CONF_TOKEN: token,}
+                )
+                return self.async_abort(
+                    reason="already_configured",
+                    description_placeholders={"email": email},
+                )
 
-        return self.async_create_entry(title=email, data={CONF_TOKEN: token})
+        return self.async_create_entry(
+            title=email, data={CONF_EMAIL: email, CONF_TOKEN: token,}
+        )
 
     async def _init_client(self, email: str, password: str) -> Client:
         return await Client.login(
@@ -44,8 +51,8 @@ class FlowHandler(config_entries.ConfigFlow):
             token, self.hass.helpers.aiohttp_client.async_get_clientsession(),
         )
 
-    async def _create_device(self, callable: Callable[[], Client]):
-        """Create device."""
+    async def _create_client(self, callable: Callable[[], Client]):
+        """Create client."""
         try:
             client = await callable()
             with timeout(10):
@@ -76,7 +83,7 @@ class FlowHandler(config_entries.ConfigFlow):
                     {vol.Required(CONF_EMAIL): str, vol.Required(CONF_PASSWORD): str,}
                 ),
             )
-        return await self._create_device(
+        return await self._create_client(
             lambda: self._init_client(user_input[CONF_EMAIL], user_input[CONF_PASSWORD])
         )
 
@@ -85,4 +92,4 @@ class FlowHandler(config_entries.ConfigFlow):
         token = user_input.get(CONF_TOKEN)
         if not token:
             return await self.async_step_user()
-        return await self._create_device(lambda: self._init_client_with_token(token))
+        return await self._create_client(lambda: self._init_client_with_token(token))
