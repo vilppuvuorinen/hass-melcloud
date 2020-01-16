@@ -5,7 +5,7 @@ from typing import Callable
 
 from aiohttp import ClientError, ClientResponseError
 from async_timeout import timeout
-from pymelcloud import Client
+from pymelcloud import Client, login
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -43,7 +43,7 @@ class FlowHandler(config_entries.ConfigFlow):
         )
 
     async def _init_client(self, email: str, password: str) -> Client:
-        return await Client.login(
+        return await login(
             email, password, self.hass.helpers.aiohttp_client.async_get_clientsession(),
         )
 
