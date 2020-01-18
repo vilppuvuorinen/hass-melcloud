@@ -1,34 +1,24 @@
 """Platform for climate integration."""
 from datetime import timedelta
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pymelcloud import Device
 
 from homeassistant.components.climate import ClimateDevice
 from homeassistant.components.climate.const import (
-    DEFAULT_MIN_TEMP,
     DEFAULT_MAX_TEMP,
+    DEFAULT_MIN_TEMP,
     HVAC_MODE_OFF,
     SUPPORT_FAN_MODE,
     SUPPORT_TARGET_TEMPERATURE,
 )
-from homeassistant.const import (
-    PRECISION_TENTHS,
-    PRECISION_WHOLE,
-    TEMP_CELSIUS,
-    TEMP_FAHRENHEIT,
-)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import PRECISION_TENTHS, PRECISION_WHOLE, TEMP_CELSIUS
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.util.temperature import convert as convert_temperature
 
-from .const import (
-    DOMAIN,
-    HVAC_MODE_LOOKUP,
-    HVAC_MODE_REVERSE_LOOKUP,
-    TEMP_UNIT_LOOKUP,
-)
+from .const import ATTR_VANE_HORIZONTAL, ATTR_VANE_VERTICAL, DOMAIN, HVAC_MODE_LOOKUP, HVAC_MODE_REVERSE_LOOKUP, TEMP_UNIT_LOOKUP
 
 ENTITY_ID_FORMAT = DOMAIN + ".{}"
 SCAN_INTERVAL = timedelta(seconds=60)
@@ -47,7 +37,7 @@ async def async_setup_entry(
 
 
 class MelCloudClimate(ClimateDevice):
-    """MELCloud device"""
+    """MELCloud device."""
 
     def __init__(self, device: Device, name=None):
         """Initialize the climate."""
@@ -69,10 +59,14 @@ class MelCloudClimate(ClimateDevice):
 
     @property
     def should_poll(self) -> bool:
+        """Return True if entity has to be polled for state.
+
+        False if entity pushes its state to HA.
+        """
         return True
 
     async def async_update(self):
-        """Update state from MELCloud"""
+        """Update state from MELCloud."""
         await self._api.async_update()
 
     @property
@@ -93,18 +87,45 @@ class MelCloudClimate(ClimateDevice):
         return PRECISION_WHOLE
 
     @property
+    def capability_attributes(self) -> Optional[Dict[str, Any]]:
+        """Return the capability attributes."""
+        data = super(MelCloudClimate, self).capability_attributes
+        if data is None:
+            return None
+        
+        vane_horizontal = self._api.device.vane_horizontal_positions()
+        if len(vane_horizontal) != 0:
+            data[ATTR_VANE_HORIZONTAL] = vane_horizontal
+
+        vane_vertical = self._api.device.vane_vertical_positions()
+        if len(vane_vertical) != 0:
+            data[ATTR_VANE_VERTICAL] = vane_vertical
+
+        print(f"{vane_horizontal} vw x {vane_vertical} vh")
+
+        return data
+
+    @property
+    def state_attributes(self) -> Dict[str, Any]:
+        """Return the optional state attributes."""
+        data = super(MelCloudClimate, self).state_attributes
+        
+        if len(self._api.device.vane_horizontal_positions()) != 0:
+            data[ATTR_VANE_HORIZONTAL] = self._api.device.vane_horizontal
+
+        if len(self._api.device.vane_vertical_positions()) != 0:
+            data[ATTR_VANE_VERTICAL] = self._api.device.vane_vertical
+
+        return data
+
+    @property
     def temperature_unit(self) -> str:
         """Return the unit of measurement used by the platform."""
-        # TODO: Either configure or read the temperature unit.
-        # 		MELCloud returns the configured unit on login of all places.
         return TEMP_UNIT_LOOKUP.get(self._api.device.temp_unit, TEMP_CELSIUS)
 
     @property
     def hvac_mode(self) -> str:
-        """Return hvac operation ie. heat, cool mode.
-
-		Need to be one of HVAC_MODE_*.
-		"""
+        """Return hvac operation ie. heat, cool mode."""
         mode = self._api.device.operation_mode
         if mode is None:
             return HVAC_MODE_OFF
@@ -114,18 +135,13 @@ class MelCloudClimate(ClimateDevice):
         """Set new target hvac mode."""
         operation_mode = HVAC_MODE_REVERSE_LOOKUP.get(hvac_mode, None)
         if operation_mode is None:
-            raise ValueError("Invalid hvac_mode [{}]", hvac_mode)
+            raise ValueError(f"Invalid hvac_mode [{hvac_mode}]")
         await self._api.device.set({"operation_mode": operation_mode})
 
     @property
     def hvac_modes(self) -> List[str]:
-        """Return the list of available hvac operation modes.
-
-		Need to be a subset of HVAC_MODES.
-		"""
-        return list(
-            map(lambda x: HVAC_MODE_LOOKUP.get(x), self._api.device.operation_modes())
-        )
+        """Return the list of available hvac operation modes."""
+        return list(map(HVAC_MODE_LOOKUP.get, self._api.device.operation_modes()))
 
     @property
     def current_temperature(self) -> Optional[float]:
@@ -150,10 +166,7 @@ class MelCloudClimate(ClimateDevice):
 
     @property
     def fan_mode(self) -> Optional[str]:
-        """Return the fan setting.
-
-		Requires SUPPORT_FAN_MODE.
-		"""
+        """Return the fan setting."""
         speed = self._api.device.fan_speed
         if speed is None:
             return None
@@ -165,10 +178,7 @@ class MelCloudClimate(ClimateDevice):
 
     @property
     def fan_modes(self) -> Optional[List[str]]:
-        """Return the list of available fan modes.
-
-		Requires SUPPORT_FAN_MODE.
-		"""
+        """Return the list of available fan modes."""
         speeds = self._api.device.fan_speeds()
         if speeds is None:
             return None
