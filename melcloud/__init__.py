@@ -2,7 +2,7 @@
 import asyncio
 from datetime import timedelta
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from aiohttp import ClientConnectionError
 from async_timeout import timeout
@@ -10,11 +10,7 @@ from pymelcloud import Client, Device
 import voluptuous as vol
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
-from homeassistant.const import (
-    CONF_EMAIL,
-    CONF_PASSWORD,
-    CONF_TOKEN,
-)
+from homeassistant.const import CONF_EMAIL, CONF_TOKEN
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.util import Throttle
@@ -38,12 +34,16 @@ async def async_setup(hass: HomeAssistantType, config: ConfigEntry):
     if DOMAIN not in config:
         return True
 
+    email = config[DOMAIN].get(CONF_EMAIL)
     token = config[DOMAIN].get(CONF_TOKEN)
     hass.async_create_task(
         hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_IMPORT}, data={CONF_TOKEN: token}
+            DOMAIN,
+            context={"source": SOURCE_IMPORT},
+            data={CONF_EMAIL: email, CONF_TOKEN: token},
         )
     )
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry):
@@ -78,6 +78,7 @@ class MelCloudDevice:
     """MELCloud Device instance."""
 
     def __init__(self, device: Device):
+        """Construct a device wrapper."""
         self.device = device
         self.name = device.name
         self._available = True
@@ -88,7 +89,6 @@ class MelCloudDevice:
         try:
             await self.device.update()
             self._available = True
-        # TODO: Catch that auth error here
         except ClientConnectionError:
             _LOGGER.warning("Connection failed for %s", self.name)
             self._available = False
@@ -98,7 +98,6 @@ class MelCloudDevice:
         try:
             await self.device.set(properties)
             self._available = True
-        # TODO: Catch that auth error here
         except ClientConnectionError:
             _LOGGER.warning("Connection failed for %s", self.name)
             self._available = False
