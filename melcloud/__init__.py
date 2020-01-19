@@ -1,19 +1,18 @@
 """The MELCloud Climate integration."""
 import asyncio
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Dict, List, Optional
 
+import voluptuous as vol
 from aiohttp import ClientConnectionError
 from async_timeout import timeout
-from pymelcloud import Client, Device
-import voluptuous as vol
-
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_TOKEN
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.util import Throttle
+from pymelcloud import Device, get_devices
 
 from .const import DOMAIN
 
@@ -21,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=60)
 
-PLATFORMS = ["climate", "sensor"]
+PLATFORMS = ["climate", "sensor", "water_heater"]
 
 CONF_LANGUAGE = "language"
 CONFIG_SCHEMA = vol.Schema(
@@ -138,13 +137,12 @@ async def mel_api_setup(hass, token) -> Optional[List[MelCloudDevice]]:
     session = hass.helpers.aiohttp_client.async_get_clientsession()
     try:
         with timeout(10):
-            client = Client(
+            devices = await get_devices(
                 token,
                 session,
                 conf_update_interval=timedelta(minutes=5),
-                device_set_debounce=timedelta(milliseconds=500),
+                device_set_debounce=timedelta(seconds=1),
             )
-            devices = await client.get_devices()
     except asyncio.TimeoutError:
         _LOGGER.debug("Connection timed out")
         raise ConfigEntryNotReady

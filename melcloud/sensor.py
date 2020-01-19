@@ -1,11 +1,10 @@
 """Support for MelCloud device sensors."""
 import logging
 
-from pymelcloud import Device
-
 from homeassistant.const import DEVICE_CLASS_TEMPERATURE, TEMP_CELSIUS
 from homeassistant.helpers.entity import Entity
 from homeassistant.util.unit_system import UnitSystem
+from pymelcloud import Device, Ecodan, HeatPump
 
 from .const import DOMAIN, TEMP_UNIT_LOOKUP
 
@@ -13,14 +12,16 @@ ATTR_MEASUREMENT = "measurement"
 ATTR_ICON = "icon"
 ATTR_UNIT_FN = "unit_fn"
 ATTR_DEVICE_CLASS = "device_class"
+ATTR_AVAILABLE = "available"
 ATTR_VALUE_FN = "value_fn"
 
-SENSORS = [
+HEAT_PUMP_SENSORS = [
     {
-        ATTR_MEASUREMENT: "Inside Temperature",
+        ATTR_MEASUREMENT: "Room Temperature",
         ATTR_ICON: "mdi:thermometer",
         ATTR_UNIT_FN: lambda x: TEMP_UNIT_LOOKUP.get(x.device.temp_unit, TEMP_CELSIUS),
         ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+        ATTR_AVAILABLE: lambda x: True,
         ATTR_VALUE_FN: lambda x: x.device.temperature,
     },
     {
@@ -28,7 +29,43 @@ SENSORS = [
         ATTR_ICON: "mdi:factory",
         ATTR_UNIT_FN: lambda x: "kWh",
         ATTR_DEVICE_CLASS: None,
+        ATTR_AVAILABLE: lambda x: True,
         ATTR_VALUE_FN: lambda x: x.device.total_energy_consumed,
+    },
+]
+
+ECODAN_SENSORS = [
+    {
+        ATTR_MEASUREMENT: "Zone 1 Room Temperature",
+        ATTR_ICON: "mdi:thermometer",
+        ATTR_UNIT_FN: lambda x: TEMP_UNIT_LOOKUP.get(x.device.temp_unit, TEMP_CELSIUS),
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+        ATTR_AVAILABLE: lambda x: len(x.device.zones) >= 1,
+        ATTR_VALUE_FN: lambda x: x.device.zones[0].room_temperature,
+    },
+    {
+        ATTR_MEASUREMENT: "Zone 2 Room Temperature",
+        ATTR_ICON: "mdi:thermometer",
+        ATTR_UNIT_FN: lambda x: TEMP_UNIT_LOOKUP.get(x.device.temp_unit, TEMP_CELSIUS),
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+        ATTR_AVAILABLE: lambda x: len(x.device.zones) >= 2,
+        ATTR_VALUE_FN: lambda x: x.device.zones[1].room_temperature,
+    },
+    {
+        ATTR_MEASUREMENT: "Tank Water Temperature",
+        ATTR_ICON: "mdi:thermometer",
+        ATTR_UNIT_FN: lambda x: TEMP_UNIT_LOOKUP.get(x.device.temp_unit, TEMP_CELSIUS),
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+        ATTR_AVAILABLE: lambda x: True,
+        ATTR_VALUE_FN: lambda x: x.device.tank_temperature,
+    },
+    {
+        ATTR_MEASUREMENT: "Outside Temperature",
+        ATTR_ICON: "mdi:thermometer",
+        ATTR_UNIT_FN: lambda x: TEMP_UNIT_LOOKUP.get(x.device.temp_unit, TEMP_CELSIUS),
+        ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
+        ATTR_AVAILABLE: lambda x: True,
+        ATTR_VALUE_FN: lambda x: x.device.outdoor_temperature,
     },
 ]
 
@@ -41,8 +78,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(
         [
             MelCloudSensor(mel_device, definition, hass.config.units)
-            for definition in SENSORS
+            for definition in HEAT_PUMP_SENSORS
             for mel_device in mel_devices
+            if isinstance(mel_device.device, HeatPump)
+        ]
+        + [
+            MelCloudSensor(mel_device, definition, hass.config.units)
+            for definition in ECODAN_SENSORS
+            for mel_device in mel_devices
+            if isinstance(mel_device, Ecodan)
         ],
         True,
     )

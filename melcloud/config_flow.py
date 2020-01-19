@@ -3,11 +3,10 @@ import asyncio
 import logging
 from typing import Callable
 
-from aiohttp import ClientError, ClientResponseError
-from async_timeout import timeout
 import pymelcloud
 import voluptuous as vol
-
+from aiohttp import ClientError, ClientResponseError
+from async_timeout import timeout
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_TOKEN
 
@@ -38,24 +37,26 @@ class FlowHandler(config_entries.ConfigFlow):
             title=email, data={CONF_EMAIL: email, CONF_TOKEN: token}
         )
 
-    async def _init_client(self, email: str, password: str) -> pymelcloud.Client:
+    async def _login_for_token(self, email: str, password: str) -> str:
         return await pymelcloud.login(
             email, password, self.hass.helpers.aiohttp_client.async_get_clientsession(),
         )
 
-    async def _init_client_with_token(self, token: str) -> pymelcloud.Client:
-        return pymelcloud.Client(
-            token, self.hass.helpers.aiohttp_client.async_get_clientsession(),
-        )
+    async def _token_identity(self, token: str) -> str:
+        print("IDENTITY")
+        return token
 
     async def _create_client(
-        self, email: str, client_creator: Callable[[], pymelcloud.Client],
+        self, email: str, token_provider: Callable[[], str],
     ):
         """Create client."""
         try:
-            client = await client_creator()
             with timeout(10):
-                await client.update_confs()
+                token = await token_provider()
+                print(f"TOKEN {token}")
+                await pymelcloud.get_devices(
+                    token, self.hass.helpers.aiohttp_client.async_get_clientsession(),
+                )
         except asyncio.TimeoutError:
             return self.async_abort(reason="cannot_connect")
         except ClientResponseError as err:
@@ -69,7 +70,7 @@ class FlowHandler(config_entries.ConfigFlow):
             _LOGGER.exception("Unexpected error creating device")
             return self.async_abort(reason="unknown")
 
-        return await self._create_entry(email, client.token)
+        return await self._create_entry(email, token)
 
     async def async_step_user(self, user_input=None):
         """User initiated config flow."""
@@ -82,15 +83,15 @@ class FlowHandler(config_entries.ConfigFlow):
             )
         email = user_input[CONF_EMAIL]
         return await self._create_client(
-            email, lambda: self._init_client(email, user_input[CONF_PASSWORD])
+            email, lambda: self._login_for_token(email, user_input[CONF_PASSWORD])
         )
 
     async def async_step_import(self, user_input):
         """Import a config entry."""
+        _LOGGER.info("IMPORT CALLED")
         email = user_input.get(CONF_EMAIL)
         token = user_input.get(CONF_TOKEN)
+        print(f"IMPORTING {email}, {token}")
         if not token:
             return await self.async_step_user()
-        return await self._create_client(
-            email, lambda: self._init_client_with_token(token)
-        )
+        return await self._create_client(email, lambda: self._token_identity(token))
