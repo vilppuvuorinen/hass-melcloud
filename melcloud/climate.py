@@ -271,7 +271,7 @@ class EcodanZoneClimate(ClimateDevice):
         # if mode is None:
         #    return HVAC_MODE_OFF
         # return HVAC_MODE_LOOKUP.get(mode)
-        return []
+        return "heat"
 
     async def async_set_hvac_mode(self, hvac_mode: str) -> None:
         """Set new target hvac mode."""
