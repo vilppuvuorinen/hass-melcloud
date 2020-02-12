@@ -3,7 +3,7 @@
   "name": "MELCloud",
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/melcloud",
-  "requirements": ["pymelcloud==2.1.0a3"],
+  "requirements": ["pymelcloud==2.1.0a4"],
   "dependencies": [],
   "codeowners": ["@vilppuvuorinen"]
 }
