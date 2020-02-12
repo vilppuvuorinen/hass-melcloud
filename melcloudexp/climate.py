@@ -67,11 +67,6 @@ class MelCloudClimate(ClimateDevice, ABC):
         self._base_device = self.api.device
         self._name = device.name
 
-    @property
-    def name(self):
-        """Return the display name of this light."""
-        return self._name
-
     async def async_update(self):
         """Update state from MELCloud."""
         await self.api.async_update()
@@ -117,6 +112,11 @@ class AtaDeviceClimate(MelCloudClimate):
     def unique_id(self) -> Optional[str]:
         """Return a unique ID."""
         return f"{self.api.device.serial}-{self.api.device.mac}"
+
+    @property
+    def name(self):
+        """Return the display name of this entity."""
+        return self._name
 
     @property
     def temperature_unit(self) -> str:
@@ -231,6 +231,15 @@ class AtwDeviceZoneClimate(MelCloudClimate):
     def unique_id(self) -> Optional[str]:
         """Return a unique ID."""
         return f"{self.api.device.serial}-{self.api.device.mac}-{self._zone.zone_index}"
+
+    @property
+    def name(self):
+        """Return the display name of this entity."""
+        if self._zone.name:
+            zone_name = self._zone.name
+        else:
+            zone_name = f"Zone {self._zone.zone_index}"
+        return f"{self._name} {zone_name}"
 
     @property
     def temperature_unit(self) -> str:
