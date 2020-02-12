@@ -2,16 +2,17 @@
 import asyncio
 from datetime import timedelta
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List
 
 from aiohttp import ClientConnectionError
 from async_timeout import timeout
-from pymelcloud import Client, Device
+from pymelcloud import Device, get_devices
 import voluptuous as vol
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
-from homeassistant.const import CONF_EMAIL, CONF_TOKEN
+from homeassistant.const import CONF_TOKEN, CONF_USERNAME
 from homeassistant.exceptions import ConfigEntryNotReady
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.util import Throttle
 
@@ -25,7 +26,15 @@ PLATFORMS = ["climate", "sensor"]
 
 CONF_LANGUAGE = "language"
 CONFIG_SCHEMA = vol.Schema(
-    {DOMAIN: vol.Schema({vol.Required(CONF_TOKEN): str})}, extra=vol.ALLOW_EXTRA,
+    {
+        DOMAIN: vol.Schema(
+            {
+                vol.Required(CONF_USERNAME): cv.string,
+                vol.Required(CONF_TOKEN): cv.string,
+            }
+        )
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 
@@ -34,13 +43,13 @@ async def async_setup(hass: HomeAssistantType, config: ConfigEntry):
     if DOMAIN not in config:
         return True
 
-    email = config[DOMAIN].get(CONF_EMAIL)
-    token = config[DOMAIN].get(CONF_TOKEN)
+    username = config[DOMAIN][CONF_USERNAME]
+    token = config[DOMAIN][CONF_TOKEN]
     hass.async_create_task(
         hass.config_entries.flow.async_init(
             DOMAIN,
             context={"source": SOURCE_IMPORT},
-            data={CONF_EMAIL: email, CONF_TOKEN: token},
+            data={CONF_USERNAME: username, CONF_TOKEN: token},
         )
     )
     return True
@@ -49,10 +58,8 @@ async def async_setup(hass: HomeAssistantType, config: ConfigEntry):
 async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry):
     """Establish connection with MELClooud."""
     conf = entry.data
-    mel_api = await mel_api_setup(hass, conf[CONF_TOKEN])
-    if not mel_api:
-        return False
-    hass.data.setdefault(DOMAIN, {}).update({entry.entry_id: mel_api})
+    mel_devices = await mel_devices_setup(hass, conf[CONF_TOKEN])
+    hass.data.setdefault(DOMAIN, {}).update({entry.entry_id: mel_devices})
     for platform in PLATFORMS:
         hass.async_create_task(
             hass.config_entries.async_forward_entry_setup(entry, platform)
@@ -62,8 +69,8 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry):
 
 async def async_unload_entry(hass, config_entry):
     """Unload a config entry."""
-    await asyncio.wait(
-        [
+    await asyncio.gather(
+        *[
             hass.config_entries.async_forward_entry_unload(config_entry, platform)
             for platform in PLATFORMS
         ]
@@ -93,7 +100,7 @@ class MelCloudDevice:
             _LOGGER.warning("Connection failed for %s", self.name)
             self._available = False
 
-    async def async_set(self, properties: Dict[str, any]):
+    async def async_set(self, properties: Dict[str, Any]):
         """Write state changes to the MELCloud API."""
         try:
             await self.device.set(properties)
@@ -128,31 +135,26 @@ class MelCloudDevice:
         unit_infos = self.device.units
         if unit_infos is not None:
             _device_info["model"] = ", ".join(
-                list(set(map(lambda x: x["model"], unit_infos)))
+                [x["model"] for x in unit_infos if x["model"]]
             )
         return _device_info
 
 
-async def mel_api_setup(hass, token) -> Optional[List[MelCloudDevice]]:
-    """Create a MELCloud instance only once."""
+async def mel_devices_setup(hass, token) -> List[MelCloudDevice]:
+    """Query connected devices from MELCloud."""
     session = hass.helpers.aiohttp_client.async_get_clientsession()
     try:
         with timeout(10):
-            client = Client(
+            all_devices = await get_devices(
                 token,
                 session,
                 conf_update_interval=timedelta(minutes=5),
-                device_set_debounce=timedelta(milliseconds=500),
+                device_set_debounce=timedelta(seconds=1),
             )
-            devices = await client.get_devices()
-    except asyncio.TimeoutError:
-        _LOGGER.debug("Connection timed out")
-        raise ConfigEntryNotReady
-    except ClientConnectionError:
-        _LOGGER.debug("ClientConnectionError")
-        raise ConfigEntryNotReady
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.error("Unexpected error when initializing client")
-        return None
+    except (asyncio.TimeoutError, ClientConnectionError) as ex:
+        raise ConfigEntryNotReady() from ex
 
-    return [MelCloudDevice(device) for device in devices]
+    wrapped_devices = {}
+    for device_type, devices in all_devices.items():
+        wrapped_devices[device_type] = [MelCloudDevice(device) for device in devices]
+    return wrapped_devices

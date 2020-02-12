@@ -7,6 +7,6 @@ services:
       - 127.0.0.1:8123:8123
     volumes:
       - ./test-config:/config
-      - ./melcloud:/config/custom_components/melcloud
+      - ./melcloudexp:/config/custom_components/melcloudexp
     environment:
       - TZ=America/New_York
