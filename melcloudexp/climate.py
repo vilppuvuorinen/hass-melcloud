@@ -2,7 +2,7 @@
 from abc import ABC
 from datetime import timedelta
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pymelcloud import DEVICE_TYPE_ATA, DEVICE_TYPE_ATW, AtaDevice, AtwDevice
 import pymelcloud.ata_device as ata
@@ -32,7 +32,7 @@ from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.util.temperature import convert as convert_temperature
 
 from . import MelCloudDevice
-from .const import DOMAIN, TEMP_UNIT_LOOKUP
+from .const import ATTR_STATUS, DOMAIN, TEMP_UNIT_LOOKUP
 
 SCAN_INTERVAL = timedelta(seconds=60)
 
@@ -236,6 +236,15 @@ class AtwDeviceZoneClimate(MelCloudClimate):
     def name(self) -> str:
         """Return the display name of this entity."""
         return f"{self._name} {self._zone.name}"
+
+    @property
+    def state_attributes(self) -> Dict[str, Any]:
+        """Return the optional state attributes with device specific additions."""
+        data = super().state_attributes
+        data[ATTR_STATUS] = ATW_ZONE_HVAC_MODE_LOOKUP.get(
+            self._zone.state, self._zone.state,
+        )
+        return data
 
     @property
     def temperature_unit(self) -> str:

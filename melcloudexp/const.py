@@ -3,6 +3,8 @@ from pymelcloud.const import UNIT_TEMP_CELSIUS, UNIT_TEMP_FAHRENHEIT
 
 from homeassistant.const import TEMP_CELSIUS, TEMP_FAHRENHEIT
 
+ATTR_STATUS = "status"
+
 DOMAIN = "melcloudexp"
 
 TEMP_UNIT_LOOKUP = {
