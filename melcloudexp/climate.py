@@ -271,9 +271,7 @@ class AtwDeviceZoneClimate(MelCloudClimate):
     @property
     def hvac_modes(self) -> List[str]:
         """Return the list of available hvac operation modes."""
-        return [HVAC_MODE_OFF] + [
-            ATW_ZONE_HVAC_MODE_LOOKUP.get(mode) for mode in self._zone.operation_modes
-        ]
+        return [self.hvac_mode]
 
     @property
     def current_temperature(self) -> Optional[float]:
