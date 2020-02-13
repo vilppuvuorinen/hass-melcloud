@@ -233,13 +233,9 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         return f"{self.api.device.serial}-{self.api.device.mac}-{self._zone.zone_index}"
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the display name of this entity."""
-        if self._zone.name:
-            zone_name = self._zone.name
-        else:
-            zone_name = f"Zone {self._zone.zone_index}"
-        return f"{self._name} {zone_name}"
+        return f"{self._name} {self._zone.name}"
 
     @property
     def temperature_unit(self) -> str:
