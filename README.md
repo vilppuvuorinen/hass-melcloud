@@ -5,7 +5,7 @@ through Home Assistant.
 
 ## Setup
 
-Install by copying the `melcloud` directory to your `custom_compoents`
+Install by copying the `melcloudexp` directory to your `custom_components`
 directory. Rest of the setup happens through the UI with a 
 `config_flow`. Good times all around.
 
