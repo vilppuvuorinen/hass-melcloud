@@ -2,6 +2,11 @@
 from typing import Optional, List
 
 from pymelcloud import DEVICE_TYPE_ATW, AtwDevice
+from pymelcloud.atw_device import (
+    PROPERTY_TARGET_TANK_TEMPERATURE,
+    PROPERTY_OPERATION_MODE,
+)
+from pymelcloud.device import PROPERTY_POWER
 
 from homeassistant.components.water_heater import (
     WaterHeaterDevice,
@@ -60,11 +65,11 @@ class AtwWaterHeater(WaterHeaterDevice):
 
     async def async_turn_on(self) -> None:
         """Turn the entity on."""
-        await self._device.set({"power": True})
+        await self._device.set({PROPERTY_POWER: True})
 
     async def async_turn_off(self) -> None:
         """Turn the entity off."""
-        await self._device.set({"power": False})
+        await self._device.set({PROPERTY_POWER: False})
 
     @property
     def temperature_unit(self) -> str:
@@ -95,7 +100,7 @@ class AtwWaterHeater(WaterHeaterDevice):
         """Set new target temperature."""
         await self._device.set(
             {
-                "target_tank_tempearture": kwargs.get(
+                PROPERTY_TARGET_TANK_TEMPERATURE: kwargs.get(
                     "temperature", self.target_temperature
                 )
             }
@@ -103,7 +108,7 @@ class AtwWaterHeater(WaterHeaterDevice):
 
     async def async_set_operation_mode(self, operation_mode):
         """Set new target operation mode."""
-        await self._device.set({"operation_mode": operation_mode})
+        await self._device.set({PROPERTY_OPERATION_MODE: operation_mode})
 
     @property
     def supported_features(self):
