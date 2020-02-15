@@ -25,10 +25,10 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     async def _create_entry(self, username: str, token: str):
         """Register new entry."""
         for entry in self._async_current_entries():
-            if entry.data.get(CONF_EMAIL, entry.title) == email:
+            if entry.data.get(CONF_USERNAME, entry.title) == username:
                 entry.connection_class = self.CONNECTION_CLASS
                 self.hass.config_entries.async_update_entry(
-                    entry, data={CONF_EMAIL: email, CONF_TOKEN: token}
+                    entry, data={CONF_USERNAME: username, CONF_TOKEN: token}
                 )
                 return self.async_abort(reason="already_configured")
 
