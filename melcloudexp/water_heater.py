@@ -18,7 +18,7 @@ from homeassistant.const import TEMP_CELSIUS
 from homeassistant.helpers.typing import HomeAssistantType
 
 from . import DOMAIN, MelCloudDevice
-from .const import TEMP_UNIT_LOOKUP
+from .const import TEMP_UNIT_LOOKUP, ATTR_STATUS
 
 
 async def async_setup_entry(
@@ -70,6 +70,13 @@ class AtwWaterHeater(WaterHeaterDevice):
     async def async_turn_off(self) -> None:
         """Turn the entity off."""
         await self._device.set({PROPERTY_POWER: False})
+
+    @property
+    def state_attributes(self):
+        """Return the optional state attributes with device specific additions."""
+        data = super().state_attributes
+        data[ATTR_STATUS] = self._device.status
+        return data
 
     @property
     def temperature_unit(self) -> str:
