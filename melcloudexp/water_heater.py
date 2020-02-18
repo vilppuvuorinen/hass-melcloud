@@ -5,7 +5,6 @@ from pymelcloud import DEVICE_TYPE_ATW, AtwDevice
 from pymelcloud.atw_device import (
     PROPERTY_TARGET_TANK_TEMPERATURE,
     PROPERTY_OPERATION_MODE,
-    PROPERTY_HOLIDAY_MODE,
 )
 from pymelcloud.device import PROPERTY_POWER
 
@@ -13,7 +12,6 @@ from homeassistant.components.water_heater import (
     WaterHeaterDevice,
     SUPPORT_OPERATION_MODE,
     SUPPORT_TARGET_TEMPERATURE,
-    SUPPORT_AWAY_MODE,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import TEMP_CELSIUS
@@ -120,22 +118,9 @@ class AtwWaterHeater(WaterHeaterDevice):
         await self._device.set({PROPERTY_OPERATION_MODE: operation_mode})
 
     @property
-    def is_away_mode_on(self) -> Optional[bool]:
-        """Return true if away mode is on."""
-        return self._device.holiday_mode
-
-    async def async_turn_away_mode_on(self):
-        """Toggle away mode on."""
-        await self._device.set({PROPERTY_HOLIDAY_MODE: True})
-
-    async def async_turn_away_mode_off(self):
-        """Toggle away mode off."""
-        await self._device.set({PROPERTY_HOLIDAY_MODE: False})
-
-    @property
     def supported_features(self):
         """Return the list of supported features."""
-        return SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE | SUPPORT_AWAY_MODE
+        return SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE
 
     @property
     def min_temp(self) -> Optional[float]:
