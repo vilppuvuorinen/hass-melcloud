@@ -1,24 +1,24 @@
 """Platform for water_heater integration."""
-from typing import Optional, List
+from typing import List, Optional
 
 from pymelcloud import DEVICE_TYPE_ATW, AtwDevice
 from pymelcloud.atw_device import (
-    PROPERTY_TARGET_TANK_TEMPERATURE,
     PROPERTY_OPERATION_MODE,
+    PROPERTY_TARGET_TANK_TEMPERATURE,
 )
 from pymelcloud.device import PROPERTY_POWER
 
 from homeassistant.components.water_heater import (
-    WaterHeaterDevice,
     SUPPORT_OPERATION_MODE,
     SUPPORT_TARGET_TEMPERATURE,
+    WaterHeaterDevice,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import TEMP_CELSIUS
 from homeassistant.helpers.typing import HomeAssistantType
 
 from . import DOMAIN, MelCloudDevice
-from .const import TEMP_UNIT_LOOKUP, ATTR_STATUS
+from .const import ATTR_STATUS, TEMP_UNIT_LOOKUP
 
 
 async def async_setup_entry(
