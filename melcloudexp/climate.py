@@ -98,14 +98,6 @@ class MelCloudClimate(ClimateDevice, ABC):
         """Return a device description for device registry."""
         return self.api.device_info
 
-    async def async_turn_on(self) -> None:
-        """Turn the entity on."""
-        await self._base_device.set({"power": True})
-
-    async def async_turn_off(self) -> None:
-        """Turn the entity off."""
-        await self._base_device.set({"power": False})
-
     @property
     def target_temperature_step(self) -> Optional[float]:
         """Return the supported step of target temperature."""
@@ -242,6 +234,14 @@ class AtaDeviceClimate(MelCloudClimate):
         """Return the list of supported features."""
         return SUPPORT_FAN_MODE | SUPPORT_TARGET_TEMPERATURE
 
+    async def async_turn_on(self) -> None:
+        """Turn the entity on."""
+        await self._device.set({"power": True})
+
+    async def async_turn_off(self) -> None:
+        """Turn the entity off."""
+        await self._device.set({"power": False})
+
     @property
     def min_temp(self) -> float:
         """Return the minimum temperature."""
@@ -357,14 +357,34 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         """Return the list of supported features."""
         return SUPPORT_TARGET_TEMPERATURE
 
+    async def async_turn_on(self) -> None:
+        """Turn the entity on.
+
+        Individual radiator zone is not allowed to control the power state of the
+        entire system.
+        """
+        raise NotImplementedError()
+
+    async def async_turn_off(self) -> None:
+        """Turn the entity off.
+
+        Individual radiator zone is not allowed to control the power state of the
+        entire system.
+        """
+        raise NotImplementedError()
+
     @property
     def min_temp(self) -> float:
-        """Return the minimum temperature."""
-        # TODO: Dig out the real min temp
+        """Return the minimum temperature.
+
+        MELCloud API does not expose radiator zone temperature limits.
+        """
         return convert_temperature(10, TEMP_CELSIUS, self.temperature_unit)
 
     @property
     def max_temp(self) -> float:
-        """Return the maximum temperature."""
-        # TODO: Dig out the real max temp
+        """Return the maximum temperature.
+
+        MELCloud API does not expose radiator zone temperature limits.
+        """
         return convert_temperature(30, TEMP_CELSIUS, self.temperature_unit)
