@@ -1,9 +1,8 @@
 {
   "domain": "melcloudexp",
-  "name": "MELCloud",
+  "name": "MELCloud (Experimental)",
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/melcloud",
-  "requirements": ["pymelcloud==2.4.1"],
-  "dependencies": [],
+  "requirements": ["pymelcloud==2.5.0"],
   "codeowners": ["@vilppuvuorinen"]
 }

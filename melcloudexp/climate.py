@@ -1,5 +1,4 @@
 """Platform for climate integration."""
-from abc import ABC
 from datetime import timedelta
 import logging
 from typing import Any, Dict, List, Optional
@@ -40,13 +39,33 @@ from .const import (
     ATTR_VANE_HORIZONTAL_POSITIONS,
     ATTR_VANE_VERTICAL,
     ATTR_VANE_VERTICAL_POSITIONS,
+    CONF_POSITION,
     DOMAIN,
+    SERVICE_SET_VANE_HORIZONTAL,
+    SERVICE_SET_VANE_VERTICAL,
     TEMP_UNIT_LOOKUP,
 )
 
 SCAN_INTERVAL = timedelta(seconds=60)
 
 _LOGGER = logging.getLogger(__name__)
+
+
+ATA_HVAC_MODE_LOOKUP = {
+    ata.OPERATION_MODE_HEAT: HVAC_MODE_HEAT,
+    ata.OPERATION_MODE_DRY: HVAC_MODE_DRY,
+    ata.OPERATION_MODE_COOL: HVAC_MODE_COOL,
+    ata.OPERATION_MODE_FAN_ONLY: HVAC_MODE_FAN_ONLY,
+    ata.OPERATION_MODE_HEAT_COOL: HVAC_MODE_HEAT_COOL,
+}
+ATA_HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in ATA_HVAC_MODE_LOOKUP.items()}
+
+
+ATW_ZONE_HVAC_MODE_LOOKUP = {
+    atw.ZONE_OPERATION_MODE_HEAT: HVAC_MODE_HEAT,
+    atw.ZONE_OPERATION_MODE_COOL: HVAC_MODE_COOL,
+}
+ATW_ZONE_HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in ATW_ZONE_HVAC_MODE_LOOKUP.items()}
 
 
 async def async_setup_entry(
@@ -69,18 +88,18 @@ async def async_setup_entry(
 
     platform = entity_platform.current_platform.get()
     platform.async_register_entity_service(
-        "set_vane_horizontal",
-        {vol.Required("position"): cv.string},
+        SERVICE_SET_VANE_HORIZONTAL,
+        {vol.Required(CONF_POSITION): cv.string},
         "async_set_vane_horizontal",
     )
     platform.async_register_entity_service(
-        "set_vane_vertical",
-        {vol.Required("entity_id"): cv.entity_id, vol.Required("position"): cv.string},
+        SERVICE_SET_VANE_VERTICAL,
+        {vol.Required(CONF_POSITION): cv.string},
         "async_set_vane_vertical",
     )
 
 
-class MelCloudClimate(ClimateDevice, ABC):
+class MelCloudClimate(ClimateDevice):
     """Base climate device."""
 
     def __init__(self, device: MelCloudDevice):
@@ -104,20 +123,10 @@ class MelCloudClimate(ClimateDevice, ABC):
         return self._base_device.temperature_increment
 
 
-ATA_HVAC_MODE_LOOKUP = {
-    ata.OPERATION_MODE_HEAT: HVAC_MODE_HEAT,
-    ata.OPERATION_MODE_DRY: HVAC_MODE_DRY,
-    ata.OPERATION_MODE_COOL: HVAC_MODE_COOL,
-    ata.OPERATION_MODE_FAN_ONLY: HVAC_MODE_FAN_ONLY,
-    ata.OPERATION_MODE_HEAT_COOL: HVAC_MODE_HEAT_COOL,
-}
-ATA_HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in ATA_HVAC_MODE_LOOKUP.items()}
-
-
 class AtaDeviceClimate(MelCloudClimate):
     """Air-to-Air climate device."""
 
-    def __init__(self, device: MelCloudDevice, ata_device: AtaDevice):
+    def __init__(self, device: MelCloudDevice, ata_device: AtaDevice) -> None:
         """Initialize the climate."""
         super().__init__(device)
         self._device = ata_device
@@ -133,20 +142,28 @@ class AtaDeviceClimate(MelCloudClimate):
         return self._name
 
     @property
-    def state_attributes(self) -> Dict[str, Any]:
+    def device_state_attributes(self) -> Optional[Dict[str, Any]]:
         """Return the optional state attributes with device specific additions."""
-        data = super().state_attributes
+        attr = {}
 
         vane_horizontal = self._device.vane_horizontal
-        vane_vertical = self._device.vane_vertical
-        if vane_horizontal is None or vane_vertical is None:
-            return data
+        if vane_horizontal:
+            attr.update(
+                {
+                    ATTR_VANE_HORIZONTAL: vane_horizontal,
+                    ATTR_VANE_HORIZONTAL_POSITIONS: self._device.vane_horizontal_positions,
+                }
+            )
 
-        data[ATTR_VANE_HORIZONTAL] = vane_horizontal
-        data[ATTR_VANE_HORIZONTAL_POSITIONS] = self._device.vane_horizontal_positions
-        data[ATTR_VANE_VERTICAL] = vane_vertical
-        data[ATTR_VANE_VERTICAL_POSITIONS] = self._device.vane_vertical_positions
-        return data
+        vane_vertical = self._device.vane_vertical
+        if vane_vertical:
+            attr.update(
+                {
+                    ATTR_VANE_VERTICAL: vane_vertical,
+                    ATTR_VANE_VERTICAL_POSITIONS: self._device.vane_vertical_positions,
+                }
+            )
+        return attr
 
     @property
     def temperature_unit(self) -> str:
@@ -217,7 +234,7 @@ class AtaDeviceClimate(MelCloudClimate):
         """Set horizontal vane position."""
         if position not in self._device.vane_horizontal_positions:
             raise ValueError(
-                f"Unsupported horizontal vane position {position}. Check the available modes from state attributes."
+                f"Invalid horizontal vane position {position}. Valid positions: [{self._device.vane_horizontal_positions}]."
             )
         await self._device.set({ata.PROPERTY_VANE_HORIZONTAL: position})
 
@@ -225,7 +242,7 @@ class AtaDeviceClimate(MelCloudClimate):
         """Set vertical vane position."""
         if position not in self._device.vane_vertical_positions:
             raise ValueError(
-                f"Unsupported vertical vane position {position}. Check the available modes from state attributes."
+                f"Invalid vertical vane position {position}. Valid positions: [{self._device.vane_vertical_positions}]."
             )
         await self._device.set({ata.PROPERTY_VANE_VERTICAL: position})
 
@@ -265,17 +282,12 @@ class AtaDeviceClimate(MelCloudClimate):
         )
 
 
-ATW_ZONE_HVAC_MODE_LOOKUP = {
-    atw.ZONE_OPERATION_MODE_HEAT: HVAC_MODE_HEAT,
-    atw.ZONE_OPERATION_MODE_COOL: HVAC_MODE_COOL,
-}
-ATW_ZONE_HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in ATW_ZONE_HVAC_MODE_LOOKUP.items()}
-
-
 class AtwDeviceZoneClimate(MelCloudClimate):
     """Air-to-Water zone climate device."""
 
-    def __init__(self, device: MelCloudDevice, atw_device: AtwDevice, atw_zone: Zone):
+    def __init__(
+        self, device: MelCloudDevice, atw_device: AtwDevice, atw_zone: Zone
+    ) -> None:
         """Initialize the climate."""
         super().__init__(device)
         self._device = atw_device
@@ -284,7 +296,7 @@ class AtwDeviceZoneClimate(MelCloudClimate):
     @property
     def unique_id(self) -> Optional[str]:
         """Return a unique ID."""
-        return f"{self.api.device.serial}-{self.api.device.mac}-{self._zone.zone_index}"
+        return f"{self.api.device.serial}-{self._zone.zone_index}"
 
     @property
     def name(self) -> str:
@@ -292,12 +304,13 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         return f"{self._name} {self._zone.name}"
 
     @property
-    def state_attributes(self) -> Dict[str, Any]:
+    def device_state_attributes(self) -> Dict[str, Any]:
         """Return the optional state attributes with device specific additions."""
-        data = super().state_attributes
-        data[ATTR_STATUS] = ATW_ZONE_HVAC_MODE_LOOKUP.get(
-            self._zone.status, self._zone.status,
-        )
+        data = {
+            ATTR_STATUS: ATW_ZONE_HVAC_MODE_LOOKUP.get(
+                self._zone.status, self._zone.status
+            )
+        }
         return data
 
     @property
@@ -356,22 +369,6 @@ class AtwDeviceZoneClimate(MelCloudClimate):
     def supported_features(self) -> int:
         """Return the list of supported features."""
         return SUPPORT_TARGET_TEMPERATURE
-
-    async def async_turn_on(self) -> None:
-        """Turn the entity on.
-
-        Individual radiator zone is not allowed to control the power state of the
-        entire system.
-        """
-        raise NotImplementedError()
-
-    async def async_turn_off(self) -> None:
-        """Turn the entity off.
-
-        Individual radiator zone is not allowed to control the power state of the
-        entire system.
-        """
-        raise NotImplementedError()
 
     @property
     def min_temp(self) -> float:

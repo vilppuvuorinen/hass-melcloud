@@ -38,7 +38,7 @@ async def async_setup_entry(
 class AtwWaterHeater(WaterHeaterDevice):
     """Air-to-Water water heater."""
 
-    def __init__(self, api: MelCloudDevice, device: AtwDevice):
+    def __init__(self, api: MelCloudDevice, device: AtwDevice) -> None:
         """Initialize water heater device."""
         self._api = api
         self._device = device
@@ -51,7 +51,7 @@ class AtwWaterHeater(WaterHeaterDevice):
     @property
     def unique_id(self) -> Optional[str]:
         """Return a unique ID."""
-        return f"{self._api.device.serial}-{self._api.device.mac}"
+        return f"{self._api.device.serial}"
 
     @property
     def name(self):
@@ -72,10 +72,9 @@ class AtwWaterHeater(WaterHeaterDevice):
         await self._device.set({PROPERTY_POWER: False})
 
     @property
-    def state_attributes(self):
+    def device_state_attributes(self):
         """Return the optional state attributes with device specific additions."""
-        data = super().state_attributes
-        data[ATTR_STATUS] = self._device.status
+        data = {ATTR_STATUS: self._device.status}
         return data
 
     @property
