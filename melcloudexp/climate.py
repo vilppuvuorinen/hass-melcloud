@@ -10,6 +10,8 @@ import pymelcloud.atw_device as atw
 from pymelcloud.atw_device import (
     PROPERTY_ZONE_1_OPERATION_MODE,
     PROPERTY_ZONE_2_OPERATION_MODE,
+    ZONE_OPERATION_MODE_COOL,
+    ZONE_OPERATION_MODE_HEAT,
     Zone,
 )
 import voluptuous as vol
@@ -65,6 +67,9 @@ ATW_ZONE_HVAC_MODE_LOOKUP = {
 }
 ATW_ZONE_HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in ATW_ZONE_HVAC_MODE_LOOKUP.items()}
 
+ATW_ZONE_FLOW_MODE_HEAT = "heat"
+ATW_ZONE_FLOW_MODE_COOL = "cool"
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
@@ -77,9 +82,25 @@ async def async_setup_entry(
             for mel_device in mel_devices[DEVICE_TYPE_ATA]
         ]
         + [
-            AtwDeviceZoneClimate(mel_device, mel_device.device, zone)
+            AtwDeviceZoneTemperatureClimate(mel_device, mel_device.device, zone)
             for mel_device in mel_devices[DEVICE_TYPE_ATW]
             for zone in mel_device.device.zones
+        ]
+        + [
+            AtwDeviceZoneFlowClimate(
+                mel_device, mel_device.device, zone, ATW_ZONE_FLOW_MODE_HEAT
+            )
+            for mel_device in mel_devices[DEVICE_TYPE_ATW]
+            for zone in mel_device.device.zones
+            if ZONE_OPERATION_MODE_HEAT in zone.operation_modes
+        ]
+        + [
+            AtwDeviceZoneFlowClimate(
+                mel_device, mel_device.device, zone, ATW_ZONE_FLOW_MODE_COOL
+            )
+            for mel_device in mel_devices[DEVICE_TYPE_ATW]
+            for zone in mel_device.device.zones
+            if ZONE_OPERATION_MODE_COOL in zone.operation_modes
         ],
         True,
     )
@@ -246,6 +267,7 @@ class AtaDeviceClimate(MelCloudClimate):
 
     @property
     def swing_mode(self) -> str | None:
+
         """Return vertical vane position or mode."""
         return self._device.vane_vertical
 
@@ -302,16 +324,6 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         self._zone = atw_zone
 
     @property
-    def unique_id(self) -> str | None:
-        """Return a unique ID."""
-        return f"{self.api.device.serial}-{self._zone.zone_index}"
-
-    @property
-    def name(self) -> str:
-        """Return the display name of this entity."""
-        return f"{self._name} {self._zone.name}"
-
-    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the optional state attributes with device specific additions."""
         data = {
@@ -358,6 +370,31 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         return [self.hvac_mode]
 
     @property
+    def supported_features(self) -> int:
+        """Return the list of supported features."""
+        return SUPPORT_TARGET_TEMPERATURE
+
+
+class AtwDeviceZoneTemperatureClimate(AtwDeviceZoneClimate):
+    """Air-to-Water zone climate device."""
+
+    def __init__(
+        self, device: MelCloudDevice, atw_device: AtwDevice, atw_zone: Zone
+    ) -> None:
+        """Initialize the climate."""
+        super().__init__(device, atw_device, atw_zone)
+
+    @property
+    def unique_id(self) -> str | None:
+        """Return a unique ID."""
+        return f"{self.api.device.serial}-{self._zone.zone_index}"
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this entity."""
+        return f"{self._name} {self._zone.name}"
+
+    @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
         return self._zone.room_temperature
@@ -374,11 +411,6 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         )
 
     @property
-    def supported_features(self) -> int:
-        """Return the list of supported features."""
-        return SUPPORT_TARGET_TEMPERATURE
-
-    @property
     def min_temp(self) -> float:
         """Return the minimum temperature.
 
@@ -393,3 +425,80 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         MELCloud API does not expose radiator zone temperature limits.
         """
         return 30
+
+
+class AtwDeviceZoneFlowClimate(AtwDeviceZoneClimate):
+    """Air-to-Water zone climate device."""
+
+    def __init__(
+        self,
+        device: MelCloudDevice,
+        atw_device: AtwDevice,
+        atw_zone: Zone,
+        flow_mode: str,
+    ) -> None:
+        """Initialize the climate."""
+        super().__init__(device, atw_device, atw_zone)
+        self._flow_mode = flow_mode
+
+    @property
+    def unique_id(self) -> str | None:
+        """Return a unique ID."""
+        if self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT:
+            suffix = "heat-flow"
+        else:
+            suffix = "cool-flow"
+        return f"{self.api.device.serial}-{self._zone.zone_index}-{suffix}"
+
+    @property
+    def name(self) -> str:
+        """Return the display name of this entity."""
+        if self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT:
+            suffix = "Heat Flow"
+        else:
+            suffix = "Cool Flow"
+        return f"{self._name} {self._zone.name} {suffix}"
+
+    @property
+    def current_temperature(self) -> float | None:
+        """Return the current temperature."""
+        return self._zone.flow_temperature
+
+    @property
+    def target_temperature(self) -> float | None:
+        """Return the temperature we try to reach."""
+        if self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT:
+            return self._zone.target_heat_flow_temperature
+
+        return self._zone.target_cool_flow_temperature
+
+    async def async_set_temperature(self, **kwargs) -> None:
+        """Set new target temperature."""
+        if self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT:
+            await self._zone.set_target_heat_flow_temperature(
+                kwargs.get("temperature", self.target_temperature)
+            )
+        else:
+            await self._zone.set_target_cool_flow_temperature(
+                kwargs.get("temperature", self.target_temperature)
+            )
+
+    @property
+    def min_temp(self) -> float:
+        """Return the minimum temperature.
+
+        MELCloud API does not expose radiator zone temperature limits.
+        """
+        if self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT:
+            return 25
+        return 5
+
+    @property
+    def max_temp(self) -> float:
+        """Return the maximum temperature.
+
+        MELCloud API does not expose radiator zone temperature limits.
+        """
+        if self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT:
+            return 60
+        return 25
