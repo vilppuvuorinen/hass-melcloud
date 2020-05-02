@@ -15,7 +15,7 @@ from pymelcloud.atw_device import (
 )
 import voluptuous as vol
 
-from homeassistant.components.climate import ClimateEntity
+from homeassistant.components.climate import ClimateDevice
 from homeassistant.components.climate.const import (
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
@@ -119,7 +119,7 @@ async def async_setup_entry(
     )
 
 
-class MelCloudClimate(ClimateEntity):
+class MelCloudClimate(ClimateDevice):
     """Base climate device."""
 
     def __init__(self, device: MelCloudDevice):
