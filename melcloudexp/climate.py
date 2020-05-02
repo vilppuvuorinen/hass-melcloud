@@ -7,13 +7,6 @@ from typing import Any
 from pymelcloud import DEVICE_TYPE_ATA, DEVICE_TYPE_ATW, AtaDevice, AtwDevice
 import pymelcloud.ata_device as ata
 import pymelcloud.atw_device as atw
-from pymelcloud.atw_device import (
-    PROPERTY_ZONE_1_OPERATION_MODE,
-    PROPERTY_ZONE_2_OPERATION_MODE,
-    ZONE_OPERATION_MODE_COOL,
-    ZONE_OPERATION_MODE_HEAT,
-    Zone,
-)
 import voluptuous as vol
 
 from homeassistant.components.climate import ClimateEntity
@@ -60,13 +53,6 @@ ATA_HVAC_MODE_LOOKUP = {
 }
 ATA_HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in ATA_HVAC_MODE_LOOKUP.items()}
 
-
-ATW_ZONE_HVAC_MODE_LOOKUP = {
-    atw.ZONE_OPERATION_MODE_HEAT: HVAC_MODE_HEAT,
-    atw.ZONE_OPERATION_MODE_COOL: HVAC_MODE_COOL,
-}
-ATW_ZONE_HVAC_MODE_REVERSE_LOOKUP = {v: k for k, v in ATW_ZONE_HVAC_MODE_LOOKUP.items()}
-
 ATW_ZONE_FLOW_MODE_HEAT = "heat"
 ATW_ZONE_FLOW_MODE_COOL = "cool"
 
@@ -82,7 +68,7 @@ async def async_setup_entry(
             for mel_device in mel_devices[DEVICE_TYPE_ATA]
         ]
         + [
-            AtwDeviceZoneTemperatureClimate(mel_device, mel_device.device, zone)
+            AtwDeviceZoneThermostatClimate(mel_device, mel_device.device, zone)
             for mel_device in mel_devices[DEVICE_TYPE_ATW]
             for zone in mel_device.device.zones
         ]
@@ -92,7 +78,7 @@ async def async_setup_entry(
             )
             for mel_device in mel_devices[DEVICE_TYPE_ATW]
             for zone in mel_device.device.zones
-            if ZONE_OPERATION_MODE_HEAT in zone.operation_modes
+            if atw.ZONE_OPERATION_MODE_HEAT_FLOW in zone.operation_modes
         ]
         + [
             AtwDeviceZoneFlowClimate(
@@ -100,7 +86,7 @@ async def async_setup_entry(
             )
             for mel_device in mel_devices[DEVICE_TYPE_ATW]
             for zone in mel_device.device.zones
-            if ZONE_OPERATION_MODE_COOL in zone.operation_modes
+            if atw.ZONE_OPERATION_MODE_COOL_FLOW in zone.operation_modes
         ],
         True,
     )
@@ -316,7 +302,7 @@ class AtwDeviceZoneClimate(MelCloudClimate):
     """Air-to-Water zone climate device."""
 
     def __init__(
-        self, device: MelCloudDevice, atw_device: AtwDevice, atw_zone: Zone
+        self, device: MelCloudDevice, atw_device: AtwDevice, atw_zone: atw.Zone
     ) -> None:
         """Initialize the climate."""
         super().__init__(device)
@@ -327,9 +313,7 @@ class AtwDeviceZoneClimate(MelCloudClimate):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the optional state attributes with device specific additions."""
         data = {
-            ATTR_STATUS: ATW_ZONE_HVAC_MODE_LOOKUP.get(
-                self._zone.status, self._zone.status
-            )
+            ATTR_STATUS: self._zone.status,
         }
         return data
 
@@ -339,47 +323,16 @@ class AtwDeviceZoneClimate(MelCloudClimate):
         return TEMP_CELSIUS
 
     @property
-    def hvac_mode(self) -> str:
-        """Return hvac operation ie. heat, cool mode."""
-        mode = self._zone.operation_mode
-        if not self._device.power or mode is None:
-            return HVAC_MODE_OFF
-        return ATW_ZONE_HVAC_MODE_LOOKUP.get(mode, HVAC_MODE_OFF)
-
-    async def async_set_hvac_mode(self, hvac_mode: str) -> None:
-        """Set new target hvac mode."""
-        if hvac_mode == HVAC_MODE_OFF:
-            await self._device.set({"power": False})
-            return
-
-        operation_mode = ATW_ZONE_HVAC_MODE_REVERSE_LOOKUP.get(hvac_mode)
-        if operation_mode is None:
-            raise ValueError(f"Invalid hvac_mode [{hvac_mode}]")
-
-        if self._zone.zone_index == 1:
-            props = {PROPERTY_ZONE_1_OPERATION_MODE: operation_mode}
-        else:
-            props = {PROPERTY_ZONE_2_OPERATION_MODE: operation_mode}
-        if self.hvac_mode == HVAC_MODE_OFF:
-            props["power"] = True
-        await self._device.set(props)
-
-    @property
-    def hvac_modes(self) -> list[str]:
-        """Return the list of available hvac operation modes."""
-        return [self.hvac_mode]
-
-    @property
     def supported_features(self) -> int:
         """Return the list of supported features."""
         return SUPPORT_TARGET_TEMPERATURE
 
 
-class AtwDeviceZoneTemperatureClimate(AtwDeviceZoneClimate):
+class AtwDeviceZoneThermostatClimate(AtwDeviceZoneClimate):
     """Air-to-Water zone climate device."""
 
     def __init__(
-        self, device: MelCloudDevice, atw_device: AtwDevice, atw_zone: Zone
+        self, device: MelCloudDevice, atw_device: AtwDevice, atw_zone: atw.Zone
     ) -> None:
         """Initialize the climate."""
         super().__init__(device, atw_device, atw_zone)
@@ -393,6 +346,54 @@ class AtwDeviceZoneTemperatureClimate(AtwDeviceZoneClimate):
     def name(self) -> str:
         """Return the display name of this entity."""
         return f"{self._name} {self._zone.name}"
+
+    @property
+    def hvac_mode(self) -> str:
+        """Return hvac operation ie. heat, cool mode."""
+        op_mode = self._zone.operation_mode
+        if not self._device.power or op_mode is None:
+            return HVAC_MODE_OFF
+
+        if op_mode == atw.ZONE_OPERATION_MODE_HEAT_THERMOSTAT:
+            return HVAC_MODE_HEAT
+
+        if op_mode == atw.ZONE_OPERATION_MODE_COOL_THERMOSTAT:
+            return HVAC_MODE_COOL
+
+        return HVAC_MODE_OFF
+
+    async def async_set_hvac_mode(self, hvac_mode: str) -> None:
+        """Set new target hvac mode."""
+        if hvac_mode == HVAC_MODE_HEAT:
+            operation_mode = atw.ZONE_OPERATION_MODE_HEAT_THERMOSTAT
+        elif hvac_mode == HVAC_MODE_COOL:
+            operation_mode = atw.ZONE_OPERATION_MODE_COOL_THERMOSTAT
+        else:
+            raise ValueError(f"Invalid hvac_mode '{hvac_mode}'")
+
+        if self._zone.zone_index == 1:
+            props = {atw.PROPERTY_ZONE_1_OPERATION_MODE: operation_mode}
+        else:
+            props = {atw.PROPERTY_ZONE_2_OPERATION_MODE: operation_mode}
+
+        await self._device.set(props)
+
+    @property
+    def hvac_modes(self) -> list[str]:
+        """Return the list of available hvac operation modes."""
+        modes = []
+        zone_modes = self._zone.operation_modes
+
+        if atw.ZONE_OPERATION_MODE_HEAT_THERMOSTAT in zone_modes:
+            modes.append(HVAC_MODE_HEAT)
+
+        if atw.ZONE_OPERATION_MODE_COOL_FLOW in zone_modes:
+            modes.append(HVAC_MODE_COOL)
+
+        if self.hvac_mode == HVAC_MODE_OFF:
+            modes.append(HVAC_MODE_OFF)
+
+        return modes
 
     @property
     def current_temperature(self) -> float | None:
@@ -434,7 +435,7 @@ class AtwDeviceZoneFlowClimate(AtwDeviceZoneClimate):
         self,
         device: MelCloudDevice,
         atw_device: AtwDevice,
-        atw_zone: Zone,
+        atw_zone: atw.Zone,
         flow_mode: str,
     ) -> None:
         """Initialize the climate."""
@@ -458,6 +459,66 @@ class AtwDeviceZoneFlowClimate(AtwDeviceZoneClimate):
         else:
             suffix = "Cool Flow"
         return f"{self._name} {self._zone.name} {suffix}"
+
+    @property
+    def hvac_mode(self) -> str:
+        """Return hvac operation ie. heat, cool mode."""
+        op_mode = self._zone.operation_mode
+        if not self._device.power or op_mode is None:
+            return HVAC_MODE_OFF
+
+        if (
+            self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT
+            and op_mode == atw.ZONE_OPERATION_MODE_HEAT_FLOW
+        ):
+            return HVAC_MODE_HEAT
+
+        if (
+            self._flow_mode == ATW_ZONE_FLOW_MODE_COOL
+            and op_mode == atw.ZONE_OPERATION_MODE_COOL_FLOW
+        ):
+            return HVAC_MODE_COOL
+
+        return HVAC_MODE_OFF
+
+    async def async_set_hvac_mode(self, hvac_mode: str) -> None:
+        """Set new target hvac mode."""
+        if self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT and hvac_mode == HVAC_MODE_HEAT:
+            operation_mode = atw.ZONE_OPERATION_MODE_HEAT_FLOW
+        elif self._flow_mode == ATW_ZONE_FLOW_MODE_COOL and hvac_mode == HVAC_MODE_COOL:
+            operation_mode = atw.ZONE_OPERATION_MODE_COOL_FLOW
+        else:
+            raise ValueError(f"Invalid hvac_mode '{hvac_mode}'")
+
+        if self._zone.zone_index == 1:
+            props = {atw.PROPERTY_ZONE_1_OPERATION_MODE: operation_mode}
+        else:
+            props = {atw.PROPERTY_ZONE_2_OPERATION_MODE: operation_mode}
+
+        await self._device.set(props)
+
+    @property
+    def hvac_modes(self) -> list[str]:
+        """Return the list of available hvac operation modes."""
+        modes = []
+        zone_modes = self._zone.operation_modes
+
+        if (
+            self._flow_mode == ATW_ZONE_FLOW_MODE_HEAT
+            and atw.ZONE_OPERATION_MODE_HEAT_FLOW in zone_modes
+        ):
+            modes.append(HVAC_MODE_HEAT)
+
+        if (
+            self._flow_mode == ATW_ZONE_FLOW_MODE_COOL
+            and atw.ZONE_OPERATION_MODE_COOL_FLOW in zone_modes
+        ):
+            modes.append(HVAC_MODE_COOL)
+
+        if self.hvac_mode == HVAC_MODE_OFF:
+            modes.append(HVAC_MODE_OFF)
+
+        return modes
 
     @property
     def current_temperature(self) -> float | None:
