@@ -1,5 +1,5 @@
 """Platform for water_heater integration."""
-from typing import List, Optional
+from __future__ import annotations
 
 from pymelcloud import DEVICE_TYPE_ATW, AtwDevice
 from pymelcloud.atw_device import (
@@ -11,18 +11,18 @@ from pymelcloud.device import PROPERTY_POWER
 from homeassistant.components.water_heater import (
     SUPPORT_OPERATION_MODE,
     SUPPORT_TARGET_TEMPERATURE,
-    WaterHeaterDevice,
+    WaterHeaterEntity,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import TEMP_CELSIUS
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.core import HomeAssistant
 
 from . import DOMAIN, MelCloudDevice
-from .const import ATTR_STATUS, TEMP_UNIT_LOOKUP
+from .const import ATTR_STATUS
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType, entry: ConfigEntry, async_add_entities
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up MelCloud device climate based on config_entry."""
     mel_devices = hass.data[DOMAIN][entry.entry_id]
@@ -35,7 +35,7 @@ async def async_setup_entry(
     )
 
 
-class AtwWaterHeater(WaterHeaterDevice):
+class AtwWaterHeater(WaterHeaterEntity):
     """Air-to-Water water heater."""
 
     def __init__(self, api: MelCloudDevice, device: AtwDevice) -> None:
@@ -49,7 +49,7 @@ class AtwWaterHeater(WaterHeaterDevice):
         await self._api.async_update()
 
     @property
-    def unique_id(self) -> Optional[str]:
+    def unique_id(self) -> str | None:
         """Return a unique ID."""
         return f"{self._api.device.serial}"
 
@@ -72,7 +72,7 @@ class AtwWaterHeater(WaterHeaterDevice):
         await self._device.set({PROPERTY_POWER: False})
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the optional state attributes with device specific additions."""
         data = {ATTR_STATUS: self._device.status}
         return data
@@ -80,20 +80,20 @@ class AtwWaterHeater(WaterHeaterDevice):
     @property
     def temperature_unit(self) -> str:
         """Return the unit of measurement used by the platform."""
-        return TEMP_UNIT_LOOKUP.get(self._device.temp_unit, TEMP_CELSIUS)
+        return TEMP_CELSIUS
 
     @property
-    def current_operation(self) -> Optional[str]:
+    def current_operation(self) -> str | None:
         """Return current operation as reported by pymelcloud."""
         return self._device.operation_mode
 
     @property
-    def operation_list(self) -> List[str]:
+    def operation_list(self) -> list[str]:
         """Return the list of available operation modes as reported by pymelcloud."""
         return self._device.operation_modes
 
     @property
-    def current_temperature(self) -> Optional[float]:
+    def current_temperature(self) -> float | None:
         """Return the current temperature."""
         return self._device.tank_temperature
 
@@ -122,11 +122,11 @@ class AtwWaterHeater(WaterHeaterDevice):
         return SUPPORT_TARGET_TEMPERATURE | SUPPORT_OPERATION_MODE
 
     @property
-    def min_temp(self) -> Optional[float]:
+    def min_temp(self) -> float | None:
         """Return the minimum temperature."""
         return self._device.target_tank_temperature_min
 
     @property
-    def max_temp(self) -> Optional[float]:
+    def max_temp(self) -> float | None:
         """Return the maximum temperature."""
         return self._device.target_tank_temperature_max
